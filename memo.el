@@ -4,73 +4,77 @@
 
 ;; Package for automating creation of memoranda.
 
+
 (setq lexical-binding t)
 
+(defun memo/generate ()
+  (interactive)
+  (find-file (read-string "memo file name:  " "memo.txt"))
 
-(setq memo-items
-      '("TO" ; "CC"
-        "FROM" "DATE" "SUBJ"))
+  (insert (s-join "\n" (append (mapcar #'memo/formatted-item (memo/items)) '(""))))
+  (newline 2)
+  (insert "MESSAGE BODY"))
+
+(defun memo/items-base ()
+      (list
+       (list "TO" (list "To" #'memo/recipient))
+       (list "FROM" (list "From" #'user-full-name))
+       (list "SUBJ" (list "Subject" #'memo/subject))
+       (list "DATE" (list "Date" #'short-date))))
+
+(defun memo/items ()
+  (let ((items (memo/items-base)))
+    (-zip
+     (memo/paddify (mapcar #'memo/colon (mapcar #'car items)))
+     (mapcar #'cadr items))))
+
+(defun memo/formatted-item (memo-item)
+  "docstring"
+  (let ((label (car memo-item))
+        (prompt
+         (s-pad-right
+            (memo/padding (length (cadr memo-item)))
+            " "
+            (cadr memo-item)))
+        (fn (caddr memo-item)))
+    (concat label (read-string prompt (funcall fn)))))
 
 
-(defun longest (lst)
+(defun memo/longest (lst)
   (apply #'max
-         (mapcar #'length lst)
-         ))
+         (mapcar #'length lst)))
 
-(defun colon (s)
+(defun memo/colon (s)
   (concat s ":"))
 
-(defun padding  (n)
+(defun memo/padding  (n)
   (+ n 2))
 
-(defun item-jusify (s pad-size)
-  (s-pad-right pad-size " " (colon s)))
+(defun memo/item-jusify (s pad-size)
+  (s-pad-right pad-size " " s))
 
-(defun paddify (lst)
+(defun memo/paddify (lst)
   (mapcar
-   (lambda (s) (item-jusify s (padding (longest lst))))
+   (lambda (s) (memo/item-jusify s (memo/padding (memo/longest lst))))
    lst))
 
+;;--------------------------------------------------
+(defun memo/recipient ()
+  "Returns a default recipient string."
+  "<recipient>")
 
-;; Replace temporary explicit handlers.
-(defun from-handler (s)
-  (concat s (read-string "from? " (user-full-name))))
+(defun memo/subject ()
+  "Returns a default subject string."
+  "<subject>")
 
-(defun to-handler (s)
-  (concat s (read-string "To? " "<recipient>")))
+;;--------------------------------------------------
 
-(defun subj-handler (s)
-  (concat s (read-string "Subject? " "<subject>")))
 
-(defun date-handler (s)
-  (concat s (read-string "Date? " (short-date))))
-
-;; (from-handler "FROM: ")
-;; (to-handler   "TO:   ")
-;; (subj-handler "SUBJ: ")
-;; (date-handler "DATE: ")
-
-(defun read-string-nil (prompt &optional initial-input history default-value inherit-input-method)
+(defun memo/read-string-nil (prompt &optional initial-input history default-value inherit-input-method)
   (let ((resp (read-string prompt initial-input history default-value inherit-input-method)))
-    (if (equal resp "")
-        nil
+    (when ((not equal) resp "")
       resp)))
 
-(defun handler (prompt default prefix reader-fn)
-  #'(lambda ()
-    (concat prefix (funcall reader-fn prompt default)))
-  )
-
-;; (setq fh (handler "from? " (user-full-name) "FROM: " 'read-string))
-
-;; (funcall fh)
-
-(defun cc-list ()
-  (let ((this (read-string-nil "Next recipent: ")))
-    (if this
-        (cons this (cc-list))
-      '()))
-  )
-
-
-(cc-list)
+;; (defun memo/formatted-item (prompt default prefix reader-fn)
+;;   #'(lambda ()
+;;     (concat prefix (funcall reader-fn prompt default))))
